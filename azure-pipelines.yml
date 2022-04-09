@@ -88,7 +88,7 @@ stages:
           - task: KubernetesManifest@0
             inputs:
               action: 'createSecret'
-              kubernetesServiceConnection: 'oldone-aks-conn'
+              kubernetesServiceConnection: 'CNIT-AKS-DEMO-CONN'
               namespace: 'default'
               secretType: 'dockerRegistry'
               secretName: $(imagePullSecret)
@@ -98,7 +98,7 @@ stages:
             displayName: Deploy to Kubernetes cluster
             inputs:
               action: deploy
-              kubernetesServiceConnection: 'oldone-aks-conn'
+              kubernetesServiceConnection: 'CNIT-AKS-DEMO-CONN'
               namespace: $(k8sNamespace)
               manifests: |
                 $(Pipeline.Workspace)/manifests/webinar-app.yaml
