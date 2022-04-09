@@ -11,9 +11,11 @@ variables:
   dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
   tag: '$(Build.BuildId)'
   poolName: 'Default'
+  k8sNamespace: 'default'
+  imagePullSecret: 'mysecret'
 
 stages:
-- stage: Continuous_Integration
+- stage: CI
   displayName: Print Params, Test, Build and Push Stage
   jobs:
   - job: Print_Parameters
@@ -62,8 +64,46 @@ stages:
         tags: |
           $(tag)
           latest
-    - task: PublishBuildArtifacts@1
+
+    - task: PublishPipelineArtifact@1
       inputs:
-        PathtoPublish: '$(System.DefaultWorkingDirectory)/deployment/'
-        ArtifactName: 'webinar-artifact'
-        publishLocation: 'Container'
+        targetPath: '$(Pipeline.Workspace)/s/deployment/webinar-app.yaml'
+        artifact: 'nodes-artifact'
+        publishLocation: 'pipeline'
+
+- stage: CD
+  displayName: Deploy stage
+  dependsOn: CI
+  jobs:
+  - job: Deploy
+    displayName: Deploy job
+    pool:
+      name: $(poolName)
+    steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: 'nodes-artifact'
+              targetPath: '$(Pipeline.Workspace)/manifests'
+          - task: KubernetesManifest@0
+            inputs:
+              action: 'createSecret'
+              kubernetesServiceConnection: 'oldone-aks-conn'
+              namespace: 'default'
+              secretType: 'dockerRegistry'
+              secretName: $(imagePullSecret)
+              dockerRegistryEndpoint: 'cnitaksdemo-conn'
+
+          - task: KubernetesManifest@0
+            displayName: Deploy to Kubernetes cluster
+            inputs:
+              action: deploy
+              kubernetesServiceConnection: 'oldone-aks-conn'
+              namespace: $(k8sNamespace)
+              manifests: |
+                $(Pipeline.Workspace)/manifests/webinar-app.yaml
+              imagePullSecrets: |
+                $(imagePullSecret)
+              containers: |
+                $(containerRegistry)/$(imageRepository):$(tag)
+              
